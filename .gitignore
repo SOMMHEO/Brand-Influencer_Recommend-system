@@ -1,0 +1,10 @@
+/libraries/__pycache__/
+libraries/__pycache__/
+libraries/__pycache__/
+training_modules/__pycache__/
+config/*.env
+config/accounts.json
+libraries/slack_hook.py
+
+R&D_test_data/
+mlruns/
