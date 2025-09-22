@@ -9,7 +9,7 @@ import json
 class SSHMySQLConnector:
     def __init__(self, ssh_host, ssh_username, ssh_password, db_username, db_password, db_name):
         self.ssh_host = ssh_host
-        self.ssh_username = ssh_username
+        self.ssh_username = ssh_username 
         self.ssh_password = ssh_password
         self.db_username = db_username
         self.db_password = db_password
@@ -36,8 +36,22 @@ class SSHMySQLConnector:
             port=self.tunnel.local_bind_port  # 터널의 로컬 포트 사용
         )
 
+    def is_connected(self):
+        # 연결 상태 확인 메서드 추가
+        if self.connection is None:
+            return False
+        try:
+            # ping을 보내 연결이 유효한지 확인
+            self.connection.ping(reconnect=True)
+            return True
+        except pymysql.Error:
+            return False
+        
     def execute_query(self, query):
-        # 쿼리 실행 후 데이터를 DataFrame으로 반환
+        # 쿼리 실행 전에 연결 상태를 확인하고 재연결
+        if not self.is_connected():
+            print('DB 연결이 끊어졌습니다. 재연결을 시도합니다.')
+            self.connect()
         return pd.read_sql_query(query, self.connection)
 
     def close(self):
@@ -125,6 +139,37 @@ def get_all_infos():
         p.brand, p.seller_uid, p.name, p.uid, p.sale_price, c.name
     '''
     product_info = sendQuery(query_product_info)
+
+    query_current_product_info = '''
+    SELECT 
+        p.brand,
+        p.seller_uid,
+        p.name AS item_name,
+        p.uid AS item_uid,
+        p.sale_price AS price,
+        c.name AS product_category,
+        COALESCE(COUNT(i.item_id), 0) AS viewcount,
+        d.sell_type,
+        p.regist_time
+    FROM 
+        int_product p
+    LEFT JOIN 
+        int_category c ON p.category_1 = c.code
+    LEFT JOIN 
+        int_statistics_member_interaction i ON p.uid = i.item_id
+    LEFT JOIN 
+        int_product_detail d ON p.uid = d.t_uid
+    WHERE 
+        p.regist_status = 0
+        AND (
+            (d.sell_type = 1 AND NOW() BETWEEN FROM_UNIXTIME(p.starttime) AND FROM_UNIXTIME(p.term_expiretime))
+            OR
+            (d.sell_type = 2 AND CURDATE() BETWEEN d.addinfo2 AND d.addinfo3)
+        )
+    GROUP BY 
+        p.brand, p.seller_uid, p.name, p.uid, p.sale_price, c.name
+    '''
+    current_product_info = sendQuery(query_current_product_info)
     
     query_user_view = '''
     SELECT 
@@ -136,7 +181,7 @@ def get_all_infos():
         int_statistics_member_interaction
     GROUP BY 
         user_id, item_id
-    '''
+    '''                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
     user_view = sendQuery(query_user_view)
     
-    return user_info, product_info, user_view
+    return user_info, current_product_info, product_info, user_view

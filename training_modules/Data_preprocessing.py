@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import pickle
+import re, emoji
 import boto3
 from io import BytesIO
 from sklearn.preprocessing import LabelEncoder
@@ -196,3 +197,35 @@ class DataSplitter:
         test = pd.concat([test_data.drop(['timestamp', 'view_cnt'], axis=1), test_negative_df], axis=0)
 
         return train, test
+    
+def clean_text(text):
+    if not isinstance(text, str):
+        return ''
+    
+    text = emoji.replace_emoji(text, replace='')
+    text = re.sub(r'[^가-힣a-zA-Z0-9\s]', '', text)
+    text = text.lower()
+    text = re.sub(r'\s+', ' ', text)
+
+    return text.strip()
+
+def preprocess_item_name(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    
+    brand_regex = '|'.join(re.escape(brand) for brand in df['brand'].unique() if pd.notna(brand))
+    if brand_regex:
+        df['item_name'] = df['item_name'].str.replace(brand_regex, '', regex=True, case=False)
+
+    df['item_name'] = df['item_name'].str.replace(r'(\d+차|n차|N차)', '', regex=True, case=False)
+    df['item_name'] = df['item_name'].str.replace(r'\b\d+\s*(?:ml|g|kg|l|근|포|개|인분)\b|\b한근\b', '', regex=True, case=False)
+    df['item_name'] = df['item_name'].str.replace(r'\b(?:x|X)\s*\d+(?:\s*\S+)?', '', regex=True, case=False)
+
+    df['item_name'] = df['item_name'].str.replace(r'\b\d+[가-힣]+\b', '', regex=True)
+    df['item_name'] = df['item_name'].str.replace(r'\b[a-zA-Z]+\d+\b', '', regex=True)
+    df['item_name'] = df['item_name'].str.replace(r'\b[a-zA-Z]+[가-힣]+\b', '', regex=True)
+
+    df['item_name_preprocessed'] = df['item_name_preprocessed'].str.replace(r'[a-zA-Z0-9]+', '', regex=True)
+    df['item_name_preprocessed'] = df['item_name_preprocessed'].str.replace(r'[^\w\s]', '', regex=True)
+    df['item_name'] = df['item_name'].str.strip().str.replace(r'\s+', ' ', regex=True)
+
+    return df

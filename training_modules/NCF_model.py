@@ -1,4 +1,4 @@
-import os
+import os, platform
 from dotenv import load_dotenv
 
 import torch
@@ -145,6 +145,11 @@ class EarlyStopping:
 ##---------------model utilities-----------------
 
 def train_gmf_model(train_loader, num_users, num_items, latent_dim, epochs=30, lr=0.001, patience=3, delta=0.0):
+    os_name = platform.system()
+    if os_name.lower() == 'linux':
+        mlflow.set_tracking_uri("file:/home/flexmatch/recommend-system/mlruns")
+        mlflow.set_experiment("MLFLOW_Experiment")
+                              
     with mlflow.start_run(run_name="GMF_Training"):
         mlflow.log_param('dataset', 'influencer-item interaction dataset')
 
